@@ -72,25 +72,28 @@ where
 }
 
 impl<Pk: MiniscriptKey> ForEachKey<Pk> for Policy<Pk> {
-    fn for_each_key<'a, F: FnMut(&'a Pk) -> bool>(&'a self, mut pred: F) -> bool
-    where
-        Pk: 'a,
-    {
+    fn for_each_key<'a, F: FnMut(&'a Pk) -> bool>(&'a self, mut pred: F) -> bool {
+        self.real_for_each_key(&mut pred)
+    }
+}
+
+impl<Pk: MiniscriptKey> Policy<Pk> {
+    fn real_for_each_key<'a, F: FnMut(&'a Pk) -> bool>(&'a self, pred: &mut F) -> bool {
         match *self {
             Policy::Unsatisfiable | Policy::Trivial => true,
-            Policy::Key(ref _pkh) => todo!("Semantic Policy KeyHash must store Pk"),
+            Policy::Key(ref pk) => pred(pk),
             Policy::Sha256(..)
             | Policy::Hash256(..)
             | Policy::Ripemd160(..)
             | Policy::Hash160(..)
             | Policy::After(..)
             | Policy::Older(..) => true,
-            Policy::Threshold(_, ref subs) => subs.iter().all(|sub| sub.for_each_key(&mut pred)),
+            Policy::Threshold(_, ref subs) => {
+                subs.iter().all(|sub| sub.real_for_each_key(&mut *pred))
+            }
         }
     }
-}
 
-impl<Pk: MiniscriptKey> Policy<Pk> {
     /// Convert a policy using one kind of public key to another
     /// type of public key
     ///

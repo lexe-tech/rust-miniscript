@@ -653,10 +653,13 @@ impl<Pk: MiniscriptKey> PolicyArc<Pk> {
 }
 
 impl<Pk: MiniscriptKey> ForEachKey<Pk> for Policy<Pk> {
-    fn for_each_key<'a, F: FnMut(&'a Pk) -> bool>(&'a self, mut pred: F) -> bool
-    where
-        Pk: 'a,
-    {
+    fn for_each_key<'a, F: FnMut(&'a Pk) -> bool>(&'a self, mut pred: F) -> bool {
+        self.real_for_each_key(&mut pred)
+    }
+}
+
+impl<Pk: MiniscriptKey> Policy<Pk> {
+    fn real_for_each_key<'a, F: FnMut(&'a Pk) -> bool>(&'a self, pred: &mut F) -> bool {
         match *self {
             Policy::Unsatisfiable | Policy::Trivial => true,
             Policy::Key(ref pk) => pred(pk),
@@ -667,9 +670,11 @@ impl<Pk: MiniscriptKey> ForEachKey<Pk> for Policy<Pk> {
             | Policy::After(..)
             | Policy::Older(..) => true,
             Policy::Threshold(_, ref subs) | Policy::And(ref subs) => {
-                subs.iter().all(|sub| sub.for_each_key(&mut pred))
+                subs.iter().all(|sub| sub.real_for_each_key(&mut *pred))
             }
-            Policy::Or(ref subs) => subs.iter().all(|(_, sub)| sub.for_each_key(&mut pred)),
+            Policy::Or(ref subs) => subs
+                .iter()
+                .all(|(_, sub)| sub.real_for_each_key(&mut *pred)),
         }
     }
 }
